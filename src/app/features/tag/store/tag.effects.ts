@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { Actions, createEffect, ofType } from '@ngrx/effects';
 import {
   concatMap,
@@ -61,9 +61,21 @@ import { DateService } from 'src/app/core/date/date.service';
 import { PlannerActions } from '../../planner/store/planner.actions';
 import { getWorklogStr } from '../../../util/get-work-log-str';
 import { deleteProject } from '../../project/store/project.actions';
+import { selectTaskById } from '../../tasks/store/task.selectors';
 
 @Injectable()
 export class TagEffects {
+  private _actions$ = inject(Actions);
+  private _store$ = inject<Store<any>>(Store);
+  private _persistenceService = inject(PersistenceService);
+  private _snackService = inject(SnackService);
+  private _tagService = inject(TagService);
+  private _workContextService = inject(WorkContextService);
+  private _taskService = inject(TaskService);
+  private _taskRepeatCfgService = inject(TaskRepeatCfgService);
+  private _router = inject(Router);
+  private _dateService = inject(DateService);
+
   saveToLs$: Observable<unknown> = this._store$.pipe(
     select(selectTagFeatureState),
     take(1),
@@ -442,7 +454,7 @@ export class TagEffects {
         ({ newTagIds, task }) =>
           newTagIds.includes(NO_LIST_TAG.id) && newTagIds.length >= 2,
       ),
-      // tap(() => console.log('removeUnlistedTagWheneverTagIsAdded')),
+      tap(() => console.log('removeUnlistedTagWheneverTagIsAdded')),
       map(({ newTagIds, task }) =>
         updateTaskTags({
           task: {
@@ -472,17 +484,24 @@ export class TagEffects {
       ),
     ),
   );
-
-  constructor(
-    private _actions$: Actions,
-    private _store$: Store<any>,
-    private _persistenceService: PersistenceService,
-    private _snackService: SnackService,
-    private _tagService: TagService,
-    private _workContextService: WorkContextService,
-    private _taskService: TaskService,
-    private _taskRepeatCfgService: TaskRepeatCfgService,
-    private _router: Router,
-    private _dateService: DateService,
-  ) {}
+  removeUnlistedTagForTransferTask$: any = createEffect(() =>
+    this._actions$.pipe(
+      ofType(PlannerActions.transferTask),
+      filter(
+        ({ task, newDay, prevDay, today }) =>
+          newDay === today && prevDay !== today && task.tagIds.includes(NO_LIST_TAG.id),
+      ),
+      switchMap(({ task }) =>
+        this._store$.select(selectTaskById, { id: task.id }).pipe(first()),
+      ),
+      filter((task) => task.tagIds.includes(NO_LIST_TAG.id) && task.tagIds.length >= 2),
+      map((freshTask) =>
+        updateTaskTags({
+          task: freshTask,
+          newTagIds: freshTask.tagIds.filter((id) => id !== NO_LIST_TAG.id),
+          isSkipExcludeCheck: true,
+        }),
+      ),
+    ),
+  );
 }

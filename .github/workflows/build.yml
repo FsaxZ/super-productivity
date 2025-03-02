@@ -1,7 +1,7 @@
 name: Build All & Release
 on:
   push:
-    branches: [master, test/git-actions]
+    branches: [master, release/*, test/git-actions]
     tags:
       - v*
 
@@ -42,7 +42,7 @@ jobs:
         run: npm i
 
       - name: Lint
-        run: npm run lint
+        run: npm run lint:ci
 
       - name: Test Unit
         run: npm run test
@@ -50,13 +50,13 @@ jobs:
       - name: Test E2E
         run: npm run e2e
       - name: Upload performance metrics as an artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: nightwatch-performance-metrics
           path: perf-metrics*.json
       - name: 'Upload E2E screenshots on failure'
         if: ${{ always() }}
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: e2eScreenshots
           path: e2e/screenshots/**/*.*
@@ -66,7 +66,7 @@ jobs:
         run: npm run build
 
       - name: Install Snapcraft
-        uses: samuelmeuli/action-snapcraft@v2
+        uses: samuelmeuli/action-snapcraft@v3
 
       - name: Build/Release Electron app
         uses: johannesjo/action-electron-builder@v1
@@ -144,7 +144,7 @@ jobs:
           echo '${{ secrets.mac_api_key }}' > ~/private_keys/AuthKey_${{ secrets.mac_api_key_id }}.p8
 
       - name: Lint
-        run: npm run lint
+        run: npm run lint:ci
 
       - name: Test Unit
         run: npm run test
@@ -221,7 +221,7 @@ jobs:
         run: npm i
 
       - name: Lint
-        run: npm run lint
+        run: npm run lint:ci
 
       - name: Test Unit
         run: npm run test

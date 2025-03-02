@@ -4,10 +4,12 @@ import {
   Component,
   HostBinding,
   HostListener,
+  inject,
   Input,
+  input,
   OnDestroy,
   OnInit,
-  ViewChild,
+  viewChild,
 } from '@angular/core';
 import { TaskCopy } from '../../tasks/task.model';
 import { EMPTY, Observable } from 'rxjs';
@@ -21,16 +23,44 @@ import { takeUntil } from 'rxjs/operators';
 import { BaseComponent } from '../../../core/base-component/base.component';
 import { DialogTaskDetailPanelComponent } from '../../tasks/dialog-task-detail-panel/dialog-task-detail-panel.component';
 import { TaskContextMenuComponent } from '../../tasks/task-context-menu/task-context-menu.component';
+import { MatIcon } from '@angular/material/icon';
+import { LongPressIOSDirective } from '../../../ui/longpress/longpress-ios.directive';
+import { TagListComponent } from '../../tag/tag-list/tag-list.component';
+import { InlineInputComponent } from '../../../ui/inline-input/inline-input.component';
+import { MsToStringPipe } from '../../../ui/duration/ms-to-string.pipe';
+import { IssueIconPipe } from '../../issue/issue-icon/issue-icon.pipe';
+import { ShortDate2Pipe } from '../../../ui/pipes/short-date2.pipe';
 
 @Component({
   selector: 'planner-task',
   templateUrl: './planner-task.component.html',
   styleUrl: './planner-task.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [
+    MatIcon,
+    LongPressIOSDirective,
+    TagListComponent,
+    InlineInputComponent,
+    TaskContextMenuComponent,
+    MsToStringPipe,
+    IssueIconPipe,
+    ShortDate2Pipe,
+  ],
 })
 export class PlannerTaskComponent extends BaseComponent implements OnInit, OnDestroy {
+  private _taskService = inject(TaskService);
+  private _cd = inject(ChangeDetectorRef);
+  private _matDialog = inject(MatDialog);
+  private _projectService = inject(ProjectService);
+
+  // TODO: Skipped for migration because:
+  //  This input is used in a control flow expression (e.g. `@if` or `*ngIf`)
+  //  and migrating would break narrowing currently.
   @Input({ required: true }) task!: TaskCopy;
-  @Input() day?: string;
+
+  // TODO remove
+  readonly day = input<string | undefined>();
+  readonly tagsToHide = input<string[]>();
 
   isRepeatTaskCreatedToday = false;
 
@@ -40,8 +70,9 @@ export class PlannerTaskComponent extends BaseComponent implements OnInit, OnDes
 
   moveToProjectList$!: Observable<Project[]>;
 
-  @ViewChild('taskContextMenu', { static: true, read: TaskContextMenuComponent })
-  taskContextMenu?: TaskContextMenuComponent;
+  readonly taskContextMenu = viewChild('taskContextMenu', {
+    read: TaskContextMenuComponent,
+  });
 
   @HostBinding('class.isDone')
   get isDone(): boolean {
@@ -80,15 +111,6 @@ export class PlannerTaskComponent extends BaseComponent implements OnInit, OnDes
         : 0;
   }
 
-  constructor(
-    private _taskService: TaskService,
-    private _cd: ChangeDetectorRef,
-    private _matDialog: MatDialog,
-    private _projectService: ProjectService,
-  ) {
-    super();
-  }
-
   ngOnInit(): void {
     this.moveToProjectList$ = this.task.projectId
       ? this._projectService.getProjectsWithoutId$(this.task.projectId)
@@ -113,7 +135,7 @@ export class PlannerTaskComponent extends BaseComponent implements OnInit, OnDes
   }
 
   openContextMenu(event: TouchEvent | MouseEvent): void {
-    this.taskContextMenu?.open(event);
+    this.taskContextMenu()?.open(event);
   }
 
   estimateTimeClick(ev: MouseEvent): void {

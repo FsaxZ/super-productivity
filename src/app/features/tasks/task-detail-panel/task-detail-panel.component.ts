@@ -4,13 +4,14 @@ import {
   ChangeDetectorRef,
   Component,
   HostListener,
-  Inject,
+  inject,
   Input,
+  input,
   LOCALE_ID,
   OnDestroy,
-  QueryList,
-  ViewChild,
-  ViewChildren,
+  OnInit,
+  viewChild,
+  viewChildren,
 } from '@angular/core';
 import { ShowSubTasksMode, TaskDetailTargetPanel, TaskWithSubTasks } from '../task.model';
 import { IssueService } from '../../issue/issue.service';
@@ -55,21 +56,37 @@ import { DialogEditTaskRepeatCfgComponent } from '../../task-repeat-cfg/dialog-e
 import { TaskRepeatCfgService } from '../../task-repeat-cfg/task-repeat-cfg.service';
 import { DialogEditTaskAttachmentComponent } from '../task-attachment/dialog-edit-attachment/dialog-edit-task-attachment.component';
 import { TaskDetailItemComponent } from './task-additional-info-item/task-detail-item.component';
-import { IssueData, IssueProviderKey } from '../../issue/issue.model';
-import { JIRA_TYPE } from '../../issue/issue.const';
-import { ProjectService } from '../../project/project.service';
+import { IssueData, IssueProviderJira, IssueProviderKey } from '../../issue/issue.model';
+import { ICAL_TYPE, JIRA_TYPE } from '../../issue/issue.const';
 import { IS_ELECTRON } from '../../../app.constants';
 import { LayoutService } from '../../../core-ui/layout/layout.service';
 import { devError } from '../../../util/dev-error';
-import { SS } from '../../../core/persistence/storage-keys.const';
 import { IS_MOBILE } from '../../../util/is-mobile';
 import { GlobalConfigService } from '../../config/global-config.service';
 import { shareReplayUntil } from '../../../util/share-replay-until';
-import { TranslateService } from '@ngx-translate/core';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { getTaskRepeatInfoText } from './get-task-repeat-info-text.util';
 import { IS_TOUCH_PRIMARY } from '../../../util/is-mouse-primary';
 import { PlannerService } from '../../planner/planner.service';
 import { DialogScheduleTaskComponent } from '../../planner/dialog-schedule-task/dialog-schedule-task.component';
+import { Store } from '@ngrx/store';
+import { selectIssueProviderById } from '../../issue/store/issue-provider.selectors';
+import { isMarkdownChecklist } from '../../markdown-checklist/is-markdown-checklist';
+import { TaskTitleComponent } from '../../../ui/task-title/task-title.component';
+import { MatIcon } from '@angular/material/icon';
+import { TaskListComponent } from '../task-list/task-list.component';
+import { MatButton } from '@angular/material/button';
+import { ProgressBarComponent } from '../../../ui/progress-bar/progress-bar.component';
+import { MatTooltip } from '@angular/material/tooltip';
+import { IssueHeaderComponent } from '../../issue/issue-header/issue-header.component';
+import { MatProgressBar } from '@angular/material/progress-bar';
+import { IssueContentComponent } from '../../issue/issue-content/issue-content.component';
+import { InlineMarkdownComponent } from '../../../ui/inline-markdown/inline-markdown.component';
+import { TaskAttachmentListComponent } from '../task-attachment/task-attachment-list/task-attachment-list.component';
+import { TagEditComponent } from '../../tag/tag-edit/tag-edit.component';
+import { AsyncPipe, DatePipe } from '@angular/common';
+import { MsToStringPipe } from '../../../ui/duration/ms-to-string.pipe';
+import { IssueIconPipe } from '../../issue/issue-icon/issue-icon.pipe';
 
 interface IssueAndType {
   id: string | number | null;
@@ -87,15 +104,52 @@ interface IssueDataAndType {
   styleUrls: ['./task-detail-panel.component.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush,
   animations: [expandAnimation, expandFadeInOnlyAnimation, fadeAnimation, swirlAnimation],
+  imports: [
+    TaskTitleComponent,
+    TaskDetailItemComponent,
+    MatIcon,
+    TaskListComponent,
+    MatButton,
+    ProgressBarComponent,
+    MatTooltip,
+    IssueHeaderComponent,
+    MatProgressBar,
+    IssueContentComponent,
+    InlineMarkdownComponent,
+    TaskAttachmentListComponent,
+    TagEditComponent,
+    AsyncPipe,
+    DatePipe,
+    MsToStringPipe,
+    TranslatePipe,
+    IssueIconPipe,
+  ],
 })
-export class TaskDetailPanelComponent implements AfterViewInit, OnDestroy {
-  @Input() isOver: boolean = false;
+export class TaskDetailPanelComponent implements OnInit, AfterViewInit, OnDestroy {
+  attachmentService = inject(TaskAttachmentService);
+  taskService = inject(TaskService);
+  layoutService = inject(LayoutService);
+  private _globalConfigService = inject(GlobalConfigService);
+  private _issueService = inject(IssueService);
+  private _reminderService = inject(ReminderService);
+  private _taskRepeatCfgService = inject(TaskRepeatCfgService);
+  private _matDialog = inject(MatDialog);
+  private _store = inject(Store);
+  readonly plannerService = inject(PlannerService);
+  private readonly _attachmentService = inject(TaskAttachmentService);
+  private _translateService = inject(TranslateService);
+  private locale = inject(LOCALE_ID);
+  private _cd = inject(ChangeDetectorRef);
+
+  readonly isOver = input<boolean>(false);
+  // TODO: Skipped for migration because:
+  //  This input is used in a control flow expression (e.g. `@if` or `*ngIf`)
+  //  and migrating would break narrowing currently.
   @Input() isDialogMode: boolean = false;
 
-  @ViewChildren(TaskDetailItemComponent)
-  itemEls?: QueryList<TaskDetailItemComponent>;
-  @ViewChild('attachmentPanelElRef')
-  attachmentPanelElRef?: TaskDetailItemComponent;
+  readonly itemEls = viewChildren(TaskDetailItemComponent);
+  readonly attachmentPanelElRef =
+    viewChild<TaskDetailItemComponent>('attachmentPanelElRef');
   IS_TOUCH_PRIMARY = IS_TOUCH_PRIMARY;
 
   _onDestroy$ = new Subject<void>();
@@ -104,6 +158,7 @@ export class TaskDetailPanelComponent implements AfterViewInit, OnDestroy {
   selectedItemIndex: number = 0;
   isFocusNotes: boolean = false;
   isDragOver: boolean = false;
+  isMarkdownChecklist: boolean = false;
 
   T: typeof T = T;
   issueAttachments: TaskAttachment[] = [];
@@ -153,14 +208,14 @@ export class TaskDetailPanelComponent implements AfterViewInit, OnDestroy {
     this.issueDataTrigger$.pipe(
       switchMap((args) => {
         if (args && args.id && args.type) {
-          if (this._taskData?.issueType === 'CALENDAR') {
+          if (this._taskData?.issueType === 'ICAL') {
             return of(null);
           }
-          if (!this._taskData || !this._taskData.projectId) {
+          if (!this._taskData || !this._taskData.issueProviderId) {
             throw new Error('task data not ready');
           }
           return this._issueService
-            .getById$(args.type, args.id, this._taskData.projectId)
+            .getById$(args.type, args.id, this._taskData.issueProviderId)
             .pipe(
               // NOTE we need this, otherwise the error is going to weird up the observable
               catchError(() => {
@@ -217,22 +272,7 @@ export class TaskDetailPanelComponent implements AfterViewInit, OnDestroy {
   private _focusTimeout?: number;
   private _dragEnterTarget?: HTMLElement;
 
-  constructor(
-    public attachmentService: TaskAttachmentService,
-    public taskService: TaskService,
-    public layoutService: LayoutService,
-    private _globalConfigService: GlobalConfigService,
-    private _issueService: IssueService,
-    private _reminderService: ReminderService,
-    private _taskRepeatCfgService: TaskRepeatCfgService,
-    private _matDialog: MatDialog,
-    private _projectService: ProjectService,
-    public readonly plannerService: PlannerService,
-    private readonly _attachmentService: TaskAttachmentService,
-    private _translateService: TranslateService,
-    @Inject(LOCALE_ID) private locale: string,
-    private _cd: ChangeDetectorRef,
-  ) {
+  constructor() {
     // NOTE: needs to be assigned here before any setter is called
     this.issueAttachments$
       .pipe(takeUntil(this._onDestroy$))
@@ -256,10 +296,15 @@ export class TaskDetailPanelComponent implements AfterViewInit, OnDestroy {
           filter(({ id, type }) => type === JIRA_TYPE),
           // not strictly reactive reactive but should work a 100% as issueIdAndType are triggered after task data
           switchMap(() => {
-            if (!this._taskData || !this._taskData.projectId) {
+            if (!this._taskData || !this._taskData.issueProviderId) {
               throw new Error('task data not ready');
             }
-            return this._projectService.getJiraCfgForProject$(this._taskData.projectId);
+            return this._store.select(
+              selectIssueProviderById<IssueProviderJira>(
+                this._taskData.issueProviderId,
+                'JIRA',
+              ),
+            );
           }),
           takeUntil(this._onDestroy$),
         )
@@ -267,9 +312,6 @@ export class TaskDetailPanelComponent implements AfterViewInit, OnDestroy {
           if (jiraCfg.isEnabled) {
             window.ea.jiraSetupImgHeaders({
               jiraCfg,
-              wonkyCookie: jiraCfg.isWonkyCookieMode
-                ? sessionStorage.getItem(SS.JIRA_WONKY_COOKIE) || undefined
-                : undefined,
             });
           }
         });
@@ -285,6 +327,8 @@ export class TaskDetailPanelComponent implements AfterViewInit, OnDestroy {
     return this._taskData as TaskWithSubTasks;
   }
 
+  // TODO: Skipped for migration because:
+  //  Accessor inputs cannot be migrated as they are too complex.
   @Input() set task(newVal: TaskWithSubTasks) {
     const prev = this._taskData;
     this._taskData = newVal;
@@ -327,6 +371,7 @@ export class TaskDetailPanelComponent implements AfterViewInit, OnDestroy {
     this.isExpandedIssuePanel = !IS_MOBILE && !!this.issueData;
     this.isExpandedNotesPanel =
       !IS_MOBILE && (!!newVal.notes || (!newVal.issueId && !newVal.attachments?.length));
+    this.isMarkdownChecklist = isMarkdownChecklist(newVal.notes || '');
   }
 
   get progress(): number {
@@ -359,6 +404,14 @@ export class TaskDetailPanelComponent implements AfterViewInit, OnDestroy {
     this.isDragOver = false;
   }
 
+  @HostListener('window:popstate') onBack(): void {
+    this.collapseParent();
+  }
+
+  ngOnInit(): void {
+    window.history.pushState({ taskDetailPanel: true }, '');
+  }
+
   ngAfterViewInit(): void {
     this.taskService.taskDetailPanelTargetPanel$
       .pipe(
@@ -371,11 +424,12 @@ export class TaskDetailPanelComponent implements AfterViewInit, OnDestroy {
       )
       .subscribe(([v]) => {
         if (v === TaskDetailTargetPanel.Attachments) {
-          if (!this.attachmentPanelElRef) {
+          const attachmentPanelElRef = this.attachmentPanelElRef();
+          if (!attachmentPanelElRef) {
             devError('this.attachmentPanelElRef not ready');
             this._focusFirst();
           } else {
-            this.focusItem(this.attachmentPanelElRef);
+            this.focusItem(attachmentPanelElRef);
           }
         } else {
           this._focusFirst();
@@ -384,6 +438,10 @@ export class TaskDetailPanelComponent implements AfterViewInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    if (window.history.state.taskDetailPanel) {
+      window.history.back();
+    }
+
     this._onDestroy$.next();
     this._onDestroy$.complete();
     window.clearTimeout(this._focusTimeout);
@@ -452,30 +510,29 @@ export class TaskDetailPanelComponent implements AfterViewInit, OnDestroy {
   }
 
   onItemKeyPress(ev: KeyboardEvent): void {
-    if (!this.itemEls) {
+    const itemEls = this.itemEls();
+    if (!itemEls) {
       throw new Error();
     }
 
     if (ev.key === 'ArrowUp' && this.selectedItemIndex > 0) {
       this.selectedItemIndex--;
-      this.itemEls.toArray()[this.selectedItemIndex].focusEl();
-    } else if (
-      ev.key === 'ArrowDown' &&
-      this.itemEls.toArray().length > this.selectedItemIndex + 1
-    ) {
+      itemEls[this.selectedItemIndex].focusEl();
+    } else if (ev.key === 'ArrowDown' && itemEls.length > this.selectedItemIndex + 1) {
       this.selectedItemIndex++;
-      this.itemEls.toArray()[this.selectedItemIndex].focusEl();
+      itemEls[this.selectedItemIndex].focusEl();
     }
   }
 
   focusItem(cmpInstance: TaskDetailItemComponent, timeoutDuration: number = 150): void {
     window.clearTimeout(this._focusTimeout);
     this._focusTimeout = window.setTimeout(() => {
-      if (!this.itemEls) {
+      const itemEls = this.itemEls();
+      if (!itemEls) {
         throw new Error();
       }
 
-      const i = this.itemEls.toArray().findIndex((el) => el === cmpInstance);
+      const i = itemEls.findIndex((el) => el === cmpInstance);
       if (i === -1) {
         this.focusItem(cmpInstance);
       } else {
@@ -497,10 +554,13 @@ export class TaskDetailPanelComponent implements AfterViewInit, OnDestroy {
 
   private _focusFirst(): void {
     this._focusTimeout = window.setTimeout(() => {
-      if (!this.itemEls) {
+      const itemEls = this.itemEls();
+      if (!itemEls) {
         throw new Error();
       }
-      this.focusItem(this.itemEls.first, 0);
+      this.focusItem(itemEls.at(0)!, 0);
     }, 150);
   }
+
+  protected readonly ICAL_TYPE = ICAL_TYPE;
 }

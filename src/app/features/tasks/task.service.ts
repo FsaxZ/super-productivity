@@ -1,6 +1,6 @@
 import { nanoid } from 'nanoid';
 import { first, map, take, withLatestFrom } from 'rxjs/operators';
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import {
   ArchiveTask,
@@ -101,6 +101,15 @@ import { DateService } from 'src/app/core/date/date.service';
   providedIn: 'root',
 })
 export class TaskService {
+  private readonly _store = inject<Store<any>>(Store);
+  private readonly _persistenceService = inject(PersistenceService);
+  private readonly _tagService = inject(TagService);
+  private readonly _workContextService = inject(WorkContextService);
+  private readonly _imexMetaService = inject(ImexMetaService);
+  private readonly _timeTrackingService = inject(GlobalTrackingIntervalService);
+  private readonly _dateService = inject(DateService);
+  private readonly _router = inject(Router);
+
   // Currently used in idle service TODO remove
   currentTaskId: string | null = null;
   currentTaskId$: Observable<string | null> = this._store.pipe(
@@ -167,16 +176,7 @@ export class TaskService {
   private _lastFocusedTaskEl: HTMLElement | null = null;
   private _allTasks$: Observable<Task[]> = this._store.pipe(select(selectAllTasks));
 
-  constructor(
-    private readonly _store: Store<any>,
-    private readonly _persistenceService: PersistenceService,
-    private readonly _tagService: TagService,
-    private readonly _workContextService: WorkContextService,
-    private readonly _imexMetaService: ImexMetaService,
-    private readonly _timeTrackingService: GlobalTrackingIntervalService,
-    private readonly _dateService: DateService,
-    private readonly _router: Router,
-  ) {
+  constructor() {
     document.addEventListener(
       'focus',
       (ev) => {
@@ -309,10 +309,11 @@ export class TaskService {
     additional: Partial<Task> = {},
     plannedAt: number,
     remindCfg: TaskReminderOptionId = TaskReminderOptionId.AtStart,
-  ): Promise<void> {
+  ): Promise<string> {
     const id = this.add(title, undefined, additional, undefined);
     const task = await this.getByIdOnce$(id).toPromise();
     this.scheduleTask(task, plannedAt, remindCfg);
+    return id;
   }
 
   remove(task: TaskWithSubTasks): void {
@@ -694,10 +695,18 @@ export class TaskService {
   }
 
   moveToProject(task: TaskWithSubTasks, projectId: string): void {
-    if (!!task.parentId || (!!task.issueId && task.issueType !== 'CALENDAR')) {
+    if (!!task.parentId) {
       throw new Error('Wrong task model');
     }
     this._store.dispatch(moveToOtherProject({ task, targetProjectId: projectId }));
+  }
+
+  moveToCurrentWorkContext(task: TaskWithSubTasks): void {
+    if (this._workContextService.activeWorkContextType === WorkContextType.TAG) {
+      this.updateTags(task, [this._workContextService.activeWorkContextId as string]);
+    } else {
+      this.moveToProject(task, this._workContextService.activeWorkContextId as string);
+    }
   }
 
   toggleStartTask(): void {
@@ -944,43 +953,52 @@ export class TaskService {
     return archiveTasks;
   }
 
-  async getAllTaskByIssueTypeForProject$(
-    projectId: string,
-    issueProviderKey: IssueProviderKey,
-  ): Promise<Task[]> {
-    const allTasks = await this.getAllTasksForProject(projectId);
-    return allTasks.filter((task) => task.issueType === issueProviderKey);
-  }
-
   async getAllIssueIdsForProject(
     projectId: string,
     issueProviderKey: IssueProviderKey,
-  ): Promise<string[] | number[]> {
+  ): Promise<string[]> {
     const allTasks = await this.getAllTasksForProject(projectId);
     return allTasks
       .filter((task) => task.issueType === issueProviderKey)
-      .map((task) => task.issueId) as string[] | number[];
+      .map((task) => task.issueId) as string[];
   }
 
-  // TODO check with new archive
-  async checkForTaskWithIssueInProject(
+  async getAllIssueIdsForProviderEverywhere(issueProviderId: string): Promise<string[]> {
+    const allTasks = await this.getAllTasksEverywhere();
+    return allTasks
+      .filter((task) => task.issueProviderId === issueProviderId)
+      .map((task) => task.issueId) as string[];
+  }
+
+  async getAllTasksEverywhere(): Promise<Task[]> {
+    const allTasks = await this._allTasks$.pipe(first()).toPromise();
+    const archiveTaskState: TaskArchive =
+      await this._persistenceService.taskArchive.loadState();
+    const ids = (archiveTaskState && (archiveTaskState.ids as string[])) || [];
+    const archiveTasks = ids.map((id) => archiveTaskState.entities[id]);
+    return [...allTasks, ...archiveTasks] as Task[];
+  }
+
+  async checkForTaskWithIssueEverywhere(
     issueId: string | number,
     issueProviderKey: IssueProviderKey,
-    projectId: string,
+    issueProviderId: string,
   ): Promise<{
     task: Task;
     subTasks: Task[] | null;
     isFromArchive: boolean;
   } | null> {
-    if (!projectId) {
-      throw new Error('No project id');
+    if (!issueProviderId) {
+      throw new Error('No issueProviderId');
     }
 
     const findTaskFn = (task: Task | ArchiveTask | undefined): boolean =>
       !!task &&
+      // NOTE: we check all, since it is theoretically possible for the same issueId to appear across issue providers
       task.issueId === issueId &&
       task.issueType === issueProviderKey &&
-      task.projectId === projectId;
+      task.issueProviderId === issueProviderId;
+
     const allTasks = (await this._allTasks$.pipe(first()).toPromise()) as Task[];
     const taskWithSameIssue: Task = allTasks.find(findTaskFn) as Task;
 

@@ -3,19 +3,25 @@ import {
   Component,
   HostBinding,
   HostListener,
-  Input,
+  inject,
+  input,
 } from '@angular/core';
 import { ScheduleFromCalendarEvent } from '../../schedule/schedule.model';
-import { CalendarIntegrationService } from '../../calendar-integration/calendar-integration.service';
+import { IssueService } from '../../issue/issue.service';
+import { MatIcon } from '@angular/material/icon';
+import { MsToStringPipe } from '../../../ui/duration/ms-to-string.pipe';
 
 @Component({
   selector: 'planner-calendar-event',
   templateUrl: './planner-calendar-event.component.html',
   styleUrl: './planner-calendar-event.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [MatIcon, MsToStringPipe],
 })
 export class PlannerCalendarEventComponent {
-  @Input({ required: true }) calendarEvent!: ScheduleFromCalendarEvent;
+  private _issueService = inject(IssueService);
+
+  readonly calendarEvent = input.required<ScheduleFromCalendarEvent>();
   isBeingSubmitted = false;
 
   @HostBinding('attr.title') title = `Convert to task`;
@@ -32,8 +38,11 @@ export class PlannerCalendarEventComponent {
     }
 
     this.isBeingSubmitted = true;
-    this._calendarIntegrationService.addEventAsTask(this.calendarEvent);
+    this._issueService.addTaskFromIssue({
+      issueDataReduced: this.calendarEvent(),
+      issueProviderId: this.calendarEvent().calProviderId,
+      issueProviderKey: 'ICAL',
+      isForceDefaultProject: true,
+    });
   }
-
-  constructor(private _calendarIntegrationService: CalendarIntegrationService) {}
 }

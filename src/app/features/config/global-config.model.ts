@@ -3,6 +3,7 @@ import { ProjectCfgFormKey } from '../project/project.model';
 import { LanguageCode, MODEL_VERSION_KEY } from '../../app.constants';
 import { SyncProvider } from '../../imex/sync/sync-provider.model';
 import { KeyboardConfig } from './keyboard-config.model';
+import { LegacyCalendarProvider } from '../issue/providers/calendar/calendar.model';
 
 export type DarkModeCfg = 'dark' | 'light' | 'system';
 
@@ -126,18 +127,8 @@ export type SyncConfig = Readonly<{
   webDav: WebDavConfig;
   localFileSync: LocalFileSyncConfig;
 }>;
-
-export type CalendarIntegrationConfig = Readonly<{
-  calendarProviders: CalendarProvider[];
-}>;
-export type CalendarProvider = Readonly<{
-  isEnabled: boolean;
-  id: string;
-  icalUrl: string;
-  icon?: string;
-  defaultProjectId: string | null;
-  checkUpdatesEvery: number;
-  showBannerBeforeThreshold: null | number;
+export type LegacyCalendarIntegrationConfig = Readonly<{
+  calendarProviders: LegacyCalendarProvider[];
 }>;
 
 export type ScheduleConfig = Readonly<{
@@ -165,11 +156,17 @@ export type DominaModeConfig = Readonly<{
   text: string;
   interval: number;
   volume: number;
+  voice: string;
 }>;
 
 export type FocusModeConfig = Readonly<{
   isAlwaysUseFocusMode: boolean;
   isSkipPreparation: boolean;
+}>;
+
+export type DailySummaryNote = Readonly<{
+  txt?: string;
+  lastUpdateDayStr?: string;
 }>;
 
 // NOTE: config properties being undefined always means that they should be overwritten with the default value
@@ -185,13 +182,14 @@ export type GlobalConfigState = Readonly<{
   localBackup: LocalBackupConfig;
   sound: SoundConfig;
   timeTracking: TimeTrackingConfig;
-  calendarIntegration: CalendarIntegrationConfig;
+  calendarIntegration?: LegacyCalendarIntegrationConfig;
   reminder: ReminderConfig;
   schedule: ScheduleConfig;
   dominaMode: DominaModeConfig;
   focusMode: FocusModeConfig;
 
   sync: SyncConfig;
+  dailySummaryNote?: DailySummaryNote;
 
   [MODEL_VERSION_KEY]?: number;
 }>;
@@ -202,9 +200,9 @@ export type GlobalSectionConfig =
   | MiscConfig
   | PomodoroConfig
   | KeyboardConfig
-  | CalendarIntegrationConfig
   | ScheduleConfig
   | ReminderConfig
+  | DailySummaryNote
   | SyncConfig;
 type Omit<T, K extends keyof T> = Pick<T, Exclude<keyof T, K>>;
 

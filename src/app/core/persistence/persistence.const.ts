@@ -59,16 +59,22 @@ import { migrateTagState } from '../../features/tag/migrate-tag-state.util';
 import { migrateNoteState } from '../../features/note/migrate-note-state.util';
 import { AppBaseData } from '../../imex/sync/sync.model';
 import { PlannerState } from '../../features/planner/store/planner.reducer';
+import { IssueProvider, IssueProviderState } from '../../features/issue/issue.model';
+import { issueProviderReducer } from '../../features/issue/store/issue-provider.reducer';
+import { migrateIssueProviderState } from '../../features/issue/migrate-issue-providers';
+import { BoardsState } from '../../features/boards/store/boards.reducer';
 
 interface PersistenceBaseModelCfgs {
   // [key: string]: PersistenceBaseModelCfg<any>;
   globalConfig: PersistenceBaseModelCfg<GlobalConfigState>;
   reminders: PersistenceBaseModelCfg<Reminder[]>;
   planner: PersistenceBaseModelCfg<PlannerState>;
+  boards: PersistenceBaseModelCfg<BoardsState>;
 }
 
 interface PersistenceEntityModelCfgs {
   project: PersistenceEntityModelCfg<ProjectState, Project>;
+  issueProvider: PersistenceEntityModelCfg<IssueProviderState, IssueProvider>;
   tag: PersistenceEntityModelCfg<TagState, Tag>;
   simpleCounter: PersistenceEntityModelCfg<SimpleCounterState, SimpleCounter>;
   note: PersistenceEntityModelCfg<NoteState, Note>;
@@ -106,6 +112,12 @@ export const BASE_MODEL_CFGS: PersistenceBaseModelCfgs = {
     // no migrations needed yet
     migrateFn: (s: PlannerState): PlannerState => s,
   },
+  boards: {
+    appDataKey: 'boards',
+    modelVersion: MODEL_VERSION.___NOT_USED_YET___,
+    // no migrations needed yet
+    migrateFn: (s: BoardsState): BoardsState => s,
+  },
 };
 
 export const ENTITY_MODEL_CFGS: PersistenceEntityModelCfgs = {
@@ -115,7 +127,12 @@ export const ENTITY_MODEL_CFGS: PersistenceEntityModelCfgs = {
     reducerFn: projectReducer as any,
     migrateFn: migrateProjectState,
   },
-
+  issueProvider: {
+    appDataKey: 'issueProvider',
+    modelVersion: MODEL_VERSION.ISSUE_PROVIDER,
+    reducerFn: issueProviderReducer,
+    migrateFn: migrateIssueProviderState,
+  },
   tag: {
     appDataKey: 'tag',
     modelVersion: MODEL_VERSION.TAG,

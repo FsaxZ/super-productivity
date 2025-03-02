@@ -4,6 +4,8 @@ import { devError } from '../../util/dev-error';
 import { Tag } from '../../features/tag/tag.model';
 import { Project } from '../../features/project/project.model';
 import { Task } from '../../features/tasks/task.model';
+import { IssueProvider } from '../../features/issue/issue.model';
+import { environment } from '../../../environments/environment';
 
 export const isValidAppData = (d: AppDataComplete): boolean => {
   const dAny: any = d;
@@ -28,6 +30,9 @@ export const isValidAppData = (d: AppDataComplete): boolean => {
     dAny.globalConfig !== null &&
     typeof dAny.taskArchive === 'object' &&
     dAny.taskArchive !== null &&
+    // TODO add check later
+    // typeof dAny.issueProvider === 'object' &&
+    // dAny.issueProvider !== null &&
     typeof dAny.project === 'object' &&
     dAny.project !== null &&
     Array.isArray(d.reminders) &&
@@ -36,7 +41,8 @@ export const isValidAppData = (d: AppDataComplete): boolean => {
     _isAllNotesAvailableAndListConsistent(d) &&
     _isNoLonelySubTasks(d) &&
     _isNoMissingSubTasks(d) &&
-    _isAllProjectsAvailable(d) &&
+    _isAllProjectsAvailableForTasks(d) &&
+    _isAllProjectsAvailableForIssueProviders(d) &&
     _isAllTagsAvailable(d) &&
     _isAllRemindersAvailable(d) &&
     _isAllTasksHaveAProjectOrTag(d);
@@ -56,6 +62,11 @@ const _validityError = (errTxt: string, additionalInfo?: any): void => {
 };
 
 const _isAllRemindersAvailable = ({ reminders, task }: AppDataComplete): boolean => {
+  if (environment.production) {
+    // NOTE don't check for production, is it is not a big problem
+    return true;
+  }
+
   let isValid: boolean = true;
   task.ids.forEach((id: string) => {
     const t: Task = task.entities[id] as Task;
@@ -73,7 +84,7 @@ const _isAllRemindersAvailable = ({ reminders, task }: AppDataComplete): boolean
   return isValid;
 };
 
-const _isAllProjectsAvailable = (data: AppDataComplete): boolean => {
+const _isAllProjectsAvailableForTasks = (data: AppDataComplete): boolean => {
   let isValid: boolean = true;
   const pids = data.project.ids as string[];
   data.task.ids.forEach((id: string) => {
@@ -92,6 +103,24 @@ const _isAllProjectsAvailable = (data: AppDataComplete): boolean => {
         t,
         data,
       });
+      isValid = false;
+    }
+  });
+
+  return isValid;
+};
+
+const _isAllProjectsAvailableForIssueProviders = (data: AppDataComplete): boolean => {
+  let isValid: boolean = true;
+  const pids = data.project.ids as string[];
+  data.issueProvider.ids.forEach((id: string) => {
+    const ip: IssueProvider = data.issueProvider.entities[id] as IssueProvider;
+    if (ip.defaultProjectId && !pids.includes(ip.defaultProjectId)) {
+      console.log(ip);
+      _validityError(
+        `defaultProjectId ${ip.defaultProjectId} from issueProvider not existing`,
+        { t: ip, data },
+      );
       isValid = false;
     }
   });

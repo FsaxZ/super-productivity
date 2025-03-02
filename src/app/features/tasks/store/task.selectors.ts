@@ -4,6 +4,7 @@ import { Task, TaskPlanned, TaskState, TaskWithSubTasks } from '../task.model';
 import { taskAdapter } from './task.adapter';
 import { devError } from '../../../util/dev-error';
 import { TODAY_TAG } from '../../tag/tag.const';
+import { IssueProvider } from '../../issue/issue.model';
 
 // TODO fix null stuff here
 
@@ -161,13 +162,15 @@ export const selectCurrentTaskParentOrCurrent = createSelector(
 // );
 
 export const selectAllTasks = createSelector(selectTaskFeatureState, selectAll);
-export const selectScheduledTasks = createSelector(selectAllTasks, (tasks) =>
-  tasks.filter((task) => task.reminderId),
-);
 
 export const selectAllTasksWithSubTasks = createSelector(
   selectAllTasks,
   mapSubTasksToTasks,
+);
+
+export const selectAllDoneIds = createSelector(
+  selectAllTasks,
+  (tasks: Task[]): string[] => tasks.filter((t) => t.isDone).map((t) => t.id),
 );
 
 // DYNAMIC SELECTORS
@@ -232,7 +235,7 @@ export const selectMainTasksWithoutTag = createSelector(
 export const selectAllCalendarTaskEventIds = createSelector(
   selectAllTasks,
   (tasks: Task[]): string[] =>
-    tasks.filter((task) => task.issueType === 'CALENDAR').map((t) => t.issueId as string),
+    tasks.filter((task) => task.issueType === 'ICAL').map((t) => t.issueId as string),
 );
 
 export const selectTasksWorkedOnOrDoneFlat = createSelector(
@@ -322,3 +325,12 @@ export const selectTasksByTag = createSelector(
     return tasks.filter((task) => task.tagIds.indexOf(props.tagId) !== -1);
   },
 );
+
+// eslint-disable-next-line @typescript-eslint/explicit-function-return-type
+export const selectAllTaskIssueIdsForIssueProvider = (issueProvider: IssueProvider) => {
+  return createSelector(selectAllTasks, (tasks: Task[]): string[] => {
+    return tasks
+      .filter((task) => task.issueProviderId === issueProvider.id)
+      .map((t) => t.issueId as string);
+  });
+};

@@ -1,6 +1,7 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { Actions, createEffect, ofType } from '@ngrx/effects';
 import {
+  __updateMultipleTaskSimple,
   addSubTask,
   addTask,
   addTimeSpent,
@@ -44,6 +45,10 @@ import { deleteProject } from '../../project/store/project.actions';
 
 @Injectable()
 export class TaskDbEffects {
+  private _actions$ = inject(Actions);
+  private _store$ = inject<Store<any>>(Store);
+  private _persistenceService = inject(PersistenceService);
+
   updateTask$: any = createEffect(
     () =>
       this._actions$.pipe(
@@ -59,6 +64,7 @@ export class TaskDbEffects {
           // setCurrentTask,
           // unsetCurrentTask,
           updateTask,
+          __updateMultipleTaskSimple,
           updateTaskTags,
           removeTagsForAllTasks,
           moveSubTask,
@@ -107,12 +113,6 @@ export class TaskDbEffects {
       ),
     { dispatch: false },
   );
-
-  constructor(
-    private _actions$: Actions,
-    private _store$: Store<any>,
-    private _persistenceService: PersistenceService,
-  ) {}
 
   // @debounce(50)
   private _saveToLs(taskState: TaskState, isSyncModelChange: boolean = false): void {

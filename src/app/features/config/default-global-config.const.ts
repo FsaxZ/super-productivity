@@ -1,8 +1,10 @@
 import { GlobalConfigState } from './global-config.model';
 import { DEFAULT_PROJECT_ID } from '../project/project.const';
 import { TRACKING_INTERVAL } from 'src/app/app.constants';
-
+import { getDefaultVoice } from 'src/app/features/domina-mode/getAvailableVoices';
 const minute = 60 * 1000;
+const defaultVoice = getDefaultVoice();
+console.log('Setting default voice as' + defaultVoice);
 
 export const DEFAULT_DAY_START = '9:00';
 export const DEFAULT_GLOBAL_CONFIG: GlobalConfigState = {
@@ -61,6 +63,7 @@ export const DEFAULT_GLOBAL_CONFIG: GlobalConfigState = {
     interval: 5 * minute,
     volume: 75,
     text: 'Your current task is: ${currentTaskTitle}',
+    voice: defaultVoice,
   },
   focusMode: {
     isAlwaysUseFocusMode: false,
@@ -89,6 +92,7 @@ export const DEFAULT_GLOBAL_CONFIG: GlobalConfigState = {
     addNewTask: 'Shift+A',
     addNewNote: 'n',
     openProjectNotes: 'Shift+N',
+    toggleIssuePanel: 'p',
     toggleSideNav: 'Shift+D',
     showHelp: '?',
     showSearchBar: 'Shift+F',
@@ -147,9 +151,6 @@ export const DEFAULT_GLOBAL_CONFIG: GlobalConfigState = {
     isTrackingReminderEnabled: false,
     isTrackingReminderShowOnMobile: false,
     trackingReminderMinTime: 5 * minute,
-  },
-  calendarIntegration: {
-    calendarProviders: [],
   },
   reminder: {
     isCountdownBannerEnabled: true,

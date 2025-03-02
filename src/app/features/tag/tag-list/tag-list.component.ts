@@ -1,7 +1,12 @@
-import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+  input,
+} from '@angular/core';
 import { standardListAnimation } from '../../../ui/animations/standard-list.ani';
 import { Tag } from '../tag.model';
-import { MatDialog } from '@angular/material/dialog';
 import { Task } from '../../tasks/task.model';
 import { WorkContextService } from '../../work-context/work-context.service';
 import { WorkContextType } from '../../work-context/work-context.model';
@@ -12,6 +17,7 @@ import { Store } from '@ngrx/store';
 import { selectTagFeatureState } from '../store/tag.reducer';
 import { selectProjectFeatureState } from '../../project/store/project.selectors';
 import { Project } from '../../project/project.model';
+import { TagComponent } from '../tag/tag.component';
 
 @Component({
   selector: 'tag-list',
@@ -19,10 +25,17 @@ import { Project } from '../../project/project.model';
   styleUrls: ['./tag-list.component.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush,
   animations: [standardListAnimation, expandFadeAnimation],
+  imports: [TagComponent],
 })
 export class TagListComponent {
+  private readonly _store = inject(Store);
+  private readonly _workContextService = inject(WorkContextService);
+
   task = input.required<Task>();
 
+  tagsToHide = input<string[]>();
+
+  isShowCurrentContextTag = input(false);
   isShowProjectTagAlways = input(false);
   isShowProjectTagNever = input(false);
   workContext = toSignal(this._workContextService.activeWorkContextTypeAndId$);
@@ -33,9 +46,15 @@ export class TagListComponent {
 
   tagIds = computed<string[]>(() => this.task().tagIds || []);
   tags = computed<Tag[]>(() => {
-    const tagIdsFiltered: string[] = this.tagIds().filter(
-      (id) => id !== this.workContext()?.activeId && id !== NO_LIST_TAG.id,
-    );
+    const tagsToHide = this.tagsToHide();
+    const tagIdsFiltered: string[] = !!tagsToHide
+      ? tagsToHide.length > 0
+        ? this.tagIds().filter((id) => !tagsToHide.includes(id))
+        : this.tagIds()
+      : this.tagIds().filter(
+          (id) => id !== this.workContext()?.activeId && id !== NO_LIST_TAG.id,
+        );
+
     const tagsI = tagIdsFiltered.map((id) => this.tagState()?.entities[id]);
     const projectId = this.projectId();
     const project = projectId && (this.projectState()?.entities[projectId] as Project);
@@ -62,10 +81,4 @@ export class TagListComponent {
     }
     return null;
   });
-
-  constructor(
-    private readonly _store: Store,
-    private readonly _workContextService: WorkContextService,
-    private readonly _matDialog: MatDialog,
-  ) {}
 }

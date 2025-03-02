@@ -95,9 +95,6 @@ $summary-point-inner-margin: $s;
   position: relative;
 }
 
-.summary-text {
-}
-
 .summary-val {
   font-weight: bold;
 }
@@ -108,15 +105,23 @@ $summary-point-inner-margin: $s;
   }
 }
 
+.simple-counter-summary {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-bottom: $s * 6;
+  margin-top: -1 * $s;
+
+  simple-counter-summary-item {
+    flex-basis: 140px;
+  }
+}
+
 .daily-summary-actions {
   margin-top: 30px;
 
   button {
     margin: 0 $s * 0.5;
-
-    mat-icon + mat-icon {
-      //margin-left: -$s;
-    }
   }
 }
 
@@ -157,10 +162,57 @@ $summary-point-inner-margin: $s;
 }
 
 .tomorrows-note {
-  border-radius: $card-border-radius;
   display: inline-block;
   width: 500px;
   max-width: 100%;
+}
+
+.day-end-note {
+  margin-bottom: 48px;
+  //margin-top: -8px;
+
+  &::ng-deep inline-markdown {
+    max-width: 400px;
+    text-align: left;
+    margin: auto;
+
+    &.isFocused {
+      border-color: transparent;
+    }
+
+    .markdown-wrapper {
+      min-height: 60px;
+      overflow: visible !important;
+      transition: $transition-standard;
+
+      @include lightTheme {
+        //background: $light-theme-bg;
+        //box-shadow: $whiteframe-shadow-1dp;
+        border: 1px solid $light-theme-extra-border-color;
+      }
+      @include darkTheme() {
+        //background: $dark-theme-bg-lighter;
+        //box-shadow: $whiteframe-shadow-1dp;
+        border: 1px solid $dark-theme-extra-border-color;
+      }
+
+      &,
+      > * {
+        border-radius: $card-border-radius * 2;
+      }
+    }
+
+    &.isFocused .markdown-wrapper {
+      box-shadow: $whiteframe-shadow-3dp !important;
+      border-color: transparent;
+    }
+
+    .markdown-unparsed,
+    .markdown-parsed {
+      color: inherit;
+      background-color: inherit;
+    }
+  }
 }
 
 @keyframes success-animation-sun {

@@ -8,15 +8,15 @@ import {
   HostListener,
   inject,
   Input,
+  LOCALE_ID,
   OnInit,
-  ViewChild,
+  viewChild,
 } from '@angular/core';
 import { ScheduleEvent, ScheduleFromCalendarEvent } from '../schedule.model';
 import { MatIcon } from '@angular/material/icon';
 import { delay, first, switchMap } from 'rxjs/operators';
 import { Store } from '@ngrx/store';
 import { selectProjectById } from '../../project/store/project.selectors';
-import { MatMiniFabButton } from '@angular/material/button';
 import { getClockStringFromHours } from '../../../util/get-clock-string-from-hours';
 import {
   SCHEDULE_TASK_MIN_DURATION_IN_MS,
@@ -27,14 +27,6 @@ import { isDraggableSE } from '../map-schedule-data/is-schedule-types-type';
 import { MatDialog } from '@angular/material/dialog';
 import { DialogEditTaskRepeatCfgComponent } from '../../task-repeat-cfg/dialog-edit-task-repeat-cfg/dialog-edit-task-repeat-cfg.component';
 import { TaskRepeatCfg } from '../../task-repeat-cfg/task-repeat-cfg.model';
-import { AsyncPipe } from '@angular/common';
-import { IssueModule } from '../../issue/issue.module';
-import {
-  MatMenu,
-  MatMenuContent,
-  MatMenuItem,
-  MatMenuTrigger,
-} from '@angular/material/menu';
 import { TranslateModule } from '@ngx-translate/core';
 import { T } from 'src/app/t.const';
 import { TaskCopy } from '../../tasks/task.model';
@@ -42,33 +34,27 @@ import { selectTaskByIdWithSubTaskData } from '../../tasks/store/task.selectors'
 import { deleteTask, updateTask } from '../../tasks/store/task.actions';
 import { DialogTimeEstimateComponent } from '../../tasks/dialog-time-estimate/dialog-time-estimate.component';
 import { IS_TOUCH_PRIMARY } from '../../../util/is-mouse-primary';
-import { DialogScheduleTaskComponent } from '../../planner/dialog-schedule-task/dialog-schedule-task.component';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { DialogTaskDetailPanelComponent } from '../../tasks/dialog-task-detail-panel/dialog-task-detail-panel.component';
-import { CalendarIntegrationService } from '../../calendar-integration/calendar-integration.service';
 import { TaskContextMenuComponent } from '../../tasks/task-context-menu/task-context-menu.component';
 import { BehaviorSubject, of } from 'rxjs';
+import { IssueService } from '../../issue/issue.service';
 
 @Component({
   selector: 'schedule-event',
-  standalone: true,
-  imports: [
-    MatIcon,
-    MatMiniFabButton,
-    AsyncPipe,
-    IssueModule,
-    MatMenu,
-    MatMenuContent,
-    MatMenuItem,
-    TranslateModule,
-    MatMenuTrigger,
-    TaskContextMenuComponent,
-  ],
+  imports: [MatIcon, TranslateModule, TaskContextMenuComponent],
   templateUrl: './schedule-event.component.html',
   styleUrl: './schedule-event.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ScheduleEventComponent implements OnInit {
+  private _store = inject(Store);
+  private _elRef = inject(ElementRef);
+  private _matDialog = inject(MatDialog);
+  private _cd = inject(ChangeDetectorRef);
+  private _issueService = inject(IssueService);
+  private locale = inject(LOCALE_ID);
+
   T: typeof T = T;
   @HostBinding('title') hoverTitle: string = '';
   @HostBinding('class') cssClass: string = '';
@@ -90,16 +76,22 @@ export class ScheduleEventComponent implements OnInit {
     | 'SPLIT_CONTINUE'
     | 'LUNCH_BREAK' = 'SPLIT_CONTINUE';
 
+  is12HourFormat = Intl.DateTimeFormat(this.locale, { hour: 'numeric' }).resolvedOptions()
+    .hour12;
+
   contextMenuPosition: { x: string; y: string } = { x: '0px', y: '0px' };
 
-  @ViewChild('taskContextMenu', { static: false, read: TaskContextMenuComponent })
-  taskContextMenu?: TaskContextMenuComponent;
+  readonly taskContextMenu = viewChild('taskContextMenu', {
+    read: TaskContextMenuComponent,
+  });
 
   protected readonly SVEType = SVEType;
   destroyRef = inject(DestroyRef);
   private _isBeingSubmitted: boolean = false;
   private _projectId$ = new BehaviorSubject<string | null>(null);
 
+  // TODO: Skipped for migration because:
+  //  Accessor inputs cannot be migrated as they are too complex.
   @Input({ required: true })
   set event(event: ScheduleEvent) {
     this.se = event;
@@ -107,7 +99,11 @@ export class ScheduleEventComponent implements OnInit {
       (this.se as any)?.data?.title ||
       (this.se.type === SVEType.LunchBreak ? 'Lunch Break' : 'TITLE');
 
-    const startClockStr = getClockStringFromHours(this.se.startHours);
+    const startClockStr = getClockStringFromHours(
+      this.is12HourFormat && this.se.startHours > 12
+        ? this.se.startHours - 12
+        : this.se.startHours,
+    );
     const endClockStr = getClockStringFromHours(
       this.se.startHours + this.se.timeLeftInHours,
     );
@@ -229,7 +225,12 @@ export class ScheduleEventComponent implements OnInit {
       this._isBeingSubmitted = true;
 
       const data = this.se.data as ScheduleFromCalendarEvent;
-      this._calendarIntegrationService.addEventAsTask(data);
+      this._issueService.addTaskFromIssue({
+        issueDataReduced: data,
+        issueProviderId: data.calProviderId,
+        issueProviderKey: 'ICAL',
+        isForceDefaultProject: true,
+      });
     }
   }
 
@@ -239,14 +240,6 @@ export class ScheduleEventComponent implements OnInit {
       this.openContextMenu(ev);
     }
   }
-
-  constructor(
-    private _store: Store,
-    private _elRef: ElementRef,
-    private _matDialog: MatDialog,
-    private _cd: ChangeDetectorRef,
-    private _calendarIntegrationService: CalendarIntegrationService,
-  ) {}
 
   ngOnInit(): void {
     if (this.task) {
@@ -269,7 +262,7 @@ export class ScheduleEventComponent implements OnInit {
   }
 
   openContextMenu(event: TouchEvent | MouseEvent): void {
-    this.taskContextMenu?.open(event);
+    this.taskContextMenu()?.open(event);
   }
 
   deleteTask(): void {
@@ -318,24 +311,15 @@ export class ScheduleEventComponent implements OnInit {
     );
   }
 
-  scheduleTask(): void {
-    let day: Date | undefined;
-    if (this.se.dayOfMonth) {
-      day = new Date();
-      if (this.se.dayOfMonth < day.getDate()) {
-        day.setMonth(day.getMonth() + 1);
-      }
-      day.setDate(this.se.dayOfMonth);
-    }
-
-    this._matDialog.open(DialogScheduleTaskComponent, {
-      // we focus inside dialog instead
-      autoFocus: false,
-      data: {
-        task: this.task,
-      },
-    });
-  }
+  // scheduleTask(): void {
+  //   this._matDialog.open(DialogScheduleTaskComponent, {
+  //     // we focus inside dialog instead
+  //     autoFocus: false,
+  //     data: {
+  //       task: this.task,
+  //     },
+  //   });
+  // }
 
   private _getIcoType():
     | 'REPEAT'

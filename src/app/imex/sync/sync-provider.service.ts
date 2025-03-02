@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { inject, Injectable } from '@angular/core';
 import { BehaviorSubject, combineLatest, Observable, of } from 'rxjs';
 import { DropboxSyncService } from './dropbox/dropbox-sync.service';
 import { SyncProvider, SyncProviderServiceInterface } from './sync-provider.model';
@@ -56,6 +56,28 @@ const KNOWN_SYNC_ERROR_PREFIX = 'KNOWN_SYNC_ERROR_SUP_';
   providedIn: 'root',
 })
 export class SyncProviderService {
+  private _dropboxSyncService = inject(DropboxSyncService);
+  private _dataImportService = inject(DataImportService);
+  private _webDavSyncService = inject(WebDavSyncService);
+  private _localFileSyncElectronService = inject(LocalFileSyncElectronService);
+  private _localFileSyncAndroidService = inject(LocalFileSyncAndroidService);
+  private _globalConfigService = inject(GlobalConfigService);
+  private _persistenceLocalService = inject(PersistenceLocalService);
+  private _translateService = inject(TranslateService);
+  private _persistenceService = inject(PersistenceService);
+  private _compressionService = inject(CompressionService);
+  private _snackService = inject(SnackService);
+  private _matDialog = inject(MatDialog);
+  private _globalProgressBarService = inject(GlobalProgressBarService);
+
+  private _currentProviderLastSync$ = new BehaviorSubject(0);
+
+  // NOTE: not really reliable for all cases, but likely good enough for what we need
+  isCurrentProviderInSync$ = combineLatest([
+    this._currentProviderLastSync$,
+    this._persistenceLocalService.lastSnyModelChange$,
+  ]).pipe(map(([lastSync, lastModelChange]) => lastSync && lastSync === lastModelChange));
+
   syncCfg$: Observable<SyncConfig> = this._globalConfigService.cfg$.pipe(
     map((cfg) => cfg?.sync),
   );
@@ -100,22 +122,6 @@ export class SyncProviderService {
       isEnabled ? this._afterCurrentSyncDoneIfAny$ : of(undefined),
     ),
   );
-
-  constructor(
-    private _dropboxSyncService: DropboxSyncService,
-    private _dataImportService: DataImportService,
-    private _webDavSyncService: WebDavSyncService,
-    private _localFileSyncElectronService: LocalFileSyncElectronService,
-    private _localFileSyncAndroidService: LocalFileSyncAndroidService,
-    private _globalConfigService: GlobalConfigService,
-    private _persistenceLocalService: PersistenceLocalService,
-    private _translateService: TranslateService,
-    private _persistenceService: PersistenceService,
-    private _compressionService: CompressionService,
-    private _snackService: SnackService,
-    private _matDialog: MatDialog,
-    private _globalProgressBarService: GlobalProgressBarService,
-  ) {}
 
   async sync(): Promise<SyncResult> {
     const currentProvider = await this.currentProvider$.pipe(take(1)).toPromise();
@@ -189,6 +195,10 @@ export class SyncProviderService {
     const localSyncMeta = await this._persistenceLocalService.load();
     const lastSync = localSyncMeta[cp.id].lastSync;
     const localRev = localSyncMeta[cp.id].rev;
+
+    if (this._currentProviderLastSync$.getValue() !== lastSync) {
+      this._currentProviderLastSync$.next(lastSync);
+    }
 
     // PRE CHECK 1
     // check if remote data & file revision changed
@@ -780,6 +790,7 @@ export class SyncProviderService {
           ? localSyncMeta[cp.id].revTaskArchive
           : revTaskArchive,
     };
+    this._currentProviderLastSync$.next(lastSync);
     await this._persistenceLocalService.save({
       ...localSyncMeta,
       [cp.id]: localSyncMetaForProvider,

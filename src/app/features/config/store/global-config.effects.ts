@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { Actions, createEffect, ofType } from '@ngrx/effects';
 import { filter, tap, withLatestFrom } from 'rxjs/operators';
 import { Store } from '@ngrx/store';
@@ -18,6 +18,13 @@ import { hideSideNav, toggleSideNav } from '../../../core-ui/layout/store/layout
 
 @Injectable()
 export class GlobalConfigEffects {
+  private _actions$ = inject(Actions);
+  private _persistenceService = inject(PersistenceService);
+  private _languageService = inject(LanguageService);
+  private _dateService = inject(DateService);
+  private _snackService = inject(SnackService);
+  private _store = inject<Store<any>>(Store);
+
   updateConfig$: any = createEffect(
     () =>
       this._actions$.pipe(
@@ -36,12 +43,12 @@ export class GlobalConfigEffects {
     () =>
       this._actions$.pipe(
         ofType(updateGlobalConfigSection),
-        tap(({ sectionKey, sectionCfg }) => {
+        tap(({ sectionKey, sectionCfg, isSkipSnack }) => {
           const isPublicSection = sectionKey.charAt(0) !== '_';
           const isPublicPropUpdated = Object.keys(sectionCfg).find(
             (key) => key.charAt(0) !== '_',
           );
-          if (isPublicPropUpdated && isPublicSection) {
+          if (isPublicPropUpdated && isPublicSection && !isSkipSnack) {
             this._snackService.open({
               type: 'SUCCESS',
               msg: T.F.CONFIG.S.UPDATE_SECTION,
@@ -91,7 +98,7 @@ export class GlobalConfigEffects {
         filter(({ sectionKey, sectionCfg }) => sectionCfg && (sectionCfg as any).lng),
         tap(({ sectionKey, sectionCfg }) => {
           // eslint-disable-next-line
-          this._languageService.setLng((sectionCfg as any)['lng']);
+          this._languageService.setLng(sectionCfg['lng']);
         }),
       ),
     { dispatch: false },
@@ -159,15 +166,6 @@ export class GlobalConfigEffects {
       ),
     { dispatch: false },
   );
-
-  constructor(
-    private _actions$: Actions,
-    private _persistenceService: PersistenceService,
-    private _languageService: LanguageService,
-    private _dateService: DateService,
-    private _snackService: SnackService,
-    private _store: Store<any>,
-  ) {}
 
   private _saveToLs(
     [action, completeState]: [any, any],

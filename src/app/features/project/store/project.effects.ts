@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { Actions, createEffect, ofType } from '@ngrx/effects';
 import { select, Store } from '@ngrx/store';
 import { concatMap, filter, first, map, switchMap, take, tap } from 'rxjs/operators';
@@ -22,7 +22,6 @@ import {
   unarchiveProject,
   updateProject,
   updateProjectAdvancedCfg,
-  updateProjectIssueProviderCfg,
   updateProjectOrder,
   updateProjectWorkEnd,
   updateProjectWorkStart,
@@ -67,6 +66,16 @@ import { ReminderService } from '../../reminder/reminder.service';
 
 @Injectable()
 export class ProjectEffects {
+  private _actions$ = inject(Actions);
+  private _store$ = inject<Store<any>>(Store);
+  private _snackService = inject(SnackService);
+  private _projectService = inject(ProjectService);
+  private _persistenceService = inject(PersistenceService);
+  private _bookmarkService = inject(BookmarkService);
+  private _globalConfigService = inject(GlobalConfigService);
+  private _dateService = inject(DateService);
+  private _reminderService = inject(ReminderService);
+
   syncProjectToLs$: Observable<unknown> = createEffect(
     () =>
       this._actions$.pipe(
@@ -77,7 +86,6 @@ export class ProjectEffects {
           deleteProject.type,
           updateProject.type,
           updateProjectAdvancedCfg.type,
-          updateProjectIssueProviderCfg.type,
           updateProjectWorkStart.type,
           updateProjectWorkEnd.type,
           addToProjectBreakTime.type,
@@ -242,6 +250,7 @@ export class ProjectEffects {
       this._actions$.pipe(
         ofType(deleteProject),
         tap(async ({ project, allTaskIds }) => {
+          // NOTE: we also do stuff on a reducer level (probably better to handle on this level @TODO refactor)
           const id = project.id as string;
           await this._persistenceService.removeCompleteRelatedDataForProject(id);
           this._removeAllArchiveTasksForProject(id);
@@ -251,18 +260,6 @@ export class ProjectEffects {
           const cfg = await this._globalConfigService.cfg$.pipe(take(1)).toPromise();
           if (id === cfg.misc.defaultProjectId) {
             this._globalConfigService.updateSection('misc', { defaultProjectId: null });
-          }
-          if (
-            cfg.calendarIntegration.calendarProviders.find(
-              (p) => p.defaultProjectId === id,
-            )
-          ) {
-            this._globalConfigService.updateSection('calendarIntegration', {
-              ...cfg.calendarIntegration,
-              calendarProviders: cfg.calendarIntegration.calendarProviders.map((p) =>
-                p.defaultProjectId === id ? { ...p, defaultProjectId: null } : p,
-              ),
-            });
           }
         }),
       ),
@@ -317,23 +314,6 @@ export class ProjectEffects {
   // PURE SNACKS
   // -----------
 
-  snackUpdateIssueProvider$: Observable<unknown> = createEffect(
-    () =>
-      this._actions$.pipe(
-        ofType(updateProjectIssueProviderCfg.type),
-        tap(({ issueProviderKey }) => {
-          this._snackService.open({
-            type: 'SUCCESS',
-            msg: T.F.PROJECT.S.ISSUE_PROVIDER_UPDATED,
-            translateParams: {
-              issueProviderKey,
-            },
-          });
-        }),
-      ),
-    { dispatch: false },
-  );
-
   snackUpdateBaseSettings$: Observable<unknown> = createEffect(
     () =>
       this._actions$.pipe(
@@ -377,18 +357,6 @@ export class ProjectEffects {
       ),
     { dispatch: false },
   );
-
-  constructor(
-    private _actions$: Actions,
-    private _store$: Store<any>,
-    private _snackService: SnackService,
-    private _projectService: ProjectService,
-    private _persistenceService: PersistenceService,
-    private _bookmarkService: BookmarkService,
-    private _globalConfigService: GlobalConfigService,
-    private _dateService: DateService,
-    private _reminderService: ReminderService,
-  ) {}
 
   private async _removeAllArchiveTasksForProject(
     projectIdToDelete: string,

@@ -55,7 +55,7 @@ jobs:
           release: false
 
       - name: 'Upload Artifact'
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: WinBuildStuff
           path: app-builds/*.exe
@@ -113,7 +113,7 @@ jobs:
           echo '${{ secrets.mac_api_key }}' > ~/private_keys/AuthKey_${{ secrets.mac_api_key_id }}.p8
 
       - name: Lint
-        run: npm run lint
+        run: npm run lint:ci
 
       - name: Test Unit
         run: npm run test
@@ -150,7 +150,7 @@ jobs:
       #  if: always()
       # run: ls -la && cat notarization-error.log
       - name: 'Upload Artifact'
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: dmg
           path: app-builds/*.dmg

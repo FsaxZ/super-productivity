@@ -1,15 +1,15 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import {
   catchError,
   distinctUntilChanged,
   first,
   map,
+  shareReplay,
   switchMap,
   tap,
 } from 'rxjs/operators';
 import { getRelevantEventsForCalendarIntegrationFromIcal } from '../schedule/ical/get-relevant-events-from-ical';
-import { CalendarProvider } from '../config/global-config.model';
 import {
   BehaviorSubject,
   combineLatest,
@@ -24,10 +24,6 @@ import { SnackService } from '../../core/snack/snack.service';
 import { getStartOfDayTimestamp } from '../../util/get-start-of-day-timestamp';
 import { getEndOfDayTimestamp } from '../../util/get-end-of-day-timestamp';
 import { CalendarIntegrationEvent } from './calendar-integration.model';
-import {
-  selectCalendarProviderById,
-  selectCalendarProviders,
-} from '../config/store/global-config.reducer';
 import { fastArrayCompare } from '../../util/fast-array-compare';
 import { selectAllCalendarTaskEventIds } from '../tasks/store/task.selectors';
 import { loadFromRealLs, saveToRealLs } from '../../core/persistence/local-storage';
@@ -35,7 +31,8 @@ import { LS } from '../../core/persistence/storage-keys.const';
 import { Store } from '@ngrx/store';
 import { ScheduleCalendarMapEntry } from '../schedule/schedule.model';
 import { getWorklogStr } from '../../util/get-work-log-str';
-import { TaskService } from '../tasks/task.service';
+import { selectCalendarProviders } from '../issue/store/issue-provider.selectors';
+import { IssueProviderCalendar } from '../issue/issue.model';
 
 const ONE_MONTHS = 60 * 60 * 1000 * 24 * 31;
 
@@ -43,6 +40,10 @@ const ONE_MONTHS = 60 * 60 * 1000 * 24 * 31;
   providedIn: 'root',
 })
 export class CalendarIntegrationService {
+  private _http = inject(HttpClient);
+  private _snackService = inject(SnackService);
+  private _store = inject(Store);
+
   icalEvents$: Observable<ScheduleCalendarMapEntry[]> = merge(
     // NOTE: we're using this rather than startWith since we want to use the freshest available cached value
     defer(() => of(this._getCalProviderFromCache())),
@@ -56,7 +57,7 @@ export class CalendarIntegrationService {
                   return of({ itemsForProvider: [], calProvider });
                 }
 
-                return this._requestEventsForSchedule$(calProvider).pipe(
+                return this.requestEventsForSchedule$(calProvider).pipe(
                   first(),
                   map((itemsForProvider: CalendarIntegrationEvent[]) => ({
                     itemsForProvider,
@@ -76,7 +77,6 @@ export class CalendarIntegrationService {
                   map(([allCalendarTaskEventIds, skippedEventIds]) => {
                     return resultForProviders.map(({ itemsForProvider, calProvider }) => {
                       return {
-                        icon: calProvider.icon || null,
                         //   // filter out items already added as tasks
                         items: itemsForProvider.filter(
                           (calEv) =>
@@ -95,18 +95,13 @@ export class CalendarIntegrationService {
             )
           : (of([]) as Observable<ScheduleCalendarMapEntry[]>);
       }),
-      // shareReplay(1),
+      shareReplay({ bufferSize: 1, refCount: true }),
     ),
   );
 
   public readonly skippedEventIds$ = new BehaviorSubject<string[]>([]);
 
-  constructor(
-    private _http: HttpClient,
-    private _snackService: SnackService,
-    private _store: Store,
-    private _taskService: TaskService,
-  ) {
+  constructor() {
     // console.log(
     //   localStorage.getItem(LS.CALENDER_EVENTS_LAST_SKIP_DAY),
     //   localStorage.getItem(LS.CALENDER_EVENTS_SKIPPED_TODAY),
@@ -123,29 +118,6 @@ export class CalendarIntegrationService {
     }
   }
 
-  async addEventAsTask(calEv: CalendarIntegrationEvent): Promise<void> {
-    const getCalProvider = calEv.calProviderId
-      ? await this._store
-          .select(selectCalendarProviderById, { id: calEv.calProviderId })
-          .pipe(first())
-          .toPromise()
-      : undefined;
-
-    await this._taskService.addAndSchedule(
-      calEv.title,
-      {
-        projectId: getCalProvider?.defaultProjectId || null,
-        issueId: calEv.id,
-        issueProviderId: calEv.calProviderId,
-        issueType: 'CALENDAR',
-        timeEstimate: calEv.duration,
-        notes: calEv.description || '',
-      },
-      calEv.start,
-    );
-    this.skipCalendarEvent(calEv.id);
-  }
-
   skipCalendarEvent(evId: string): void {
     this.skippedEventIds$.next([...this.skippedEventIds$.getValue(), evId]);
     localStorage.setItem(
@@ -156,9 +128,10 @@ export class CalendarIntegrationService {
   }
 
   requestEvents$(
-    calProvider: CalendarProvider,
+    calProvider: IssueProviderCalendar,
     start = getStartOfDayTimestamp(),
     end = getEndOfDayTimestamp(),
+    isForwardError = false,
   ): Observable<CalendarIntegrationEvent[]> {
     console.log('REQUEST EVENTS', calProvider, start, end);
 
@@ -180,15 +153,24 @@ export class CalendarIntegrationService {
             errTxt: err?.toString() || err?.status || err?.message || 'UNKNOWN :(',
           },
         });
+        if (isForwardError) {
+          throw new Error(err);
+        }
         return of([]);
       }),
     );
   }
 
-  private _requestEventsForSchedule$(
-    calProvider: CalendarProvider,
+  requestEventsForSchedule$(
+    calProvider: IssueProviderCalendar,
+    isForwardError = false,
   ): Observable<CalendarIntegrationEvent[]> {
-    return this.requestEvents$(calProvider, Date.now(), Date.now() + ONE_MONTHS);
+    return this.requestEvents$(
+      calProvider,
+      Date.now(),
+      Date.now() + ONE_MONTHS,
+      isForwardError,
+    );
   }
 
   private _getCalProviderFromCache(): ScheduleCalendarMapEntry[] {

@@ -61,7 +61,7 @@ jobs:
         run: npm i
 
       - name: Lint
-        run: npm run lint
+        run: npm run lint:ci
 
       - name: Test Unit
         run: npm run test
@@ -77,7 +77,7 @@ jobs:
           github_token: ${{ secrets.github_token }}
 
       - name: 'Upload Artifact'
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: WinStoreRelease
           path: app-builds/*.appx

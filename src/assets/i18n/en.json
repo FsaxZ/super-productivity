@@ -64,7 +64,7 @@
     "BOARDS": {
       "DEFAULT": {
         "DONE": "Done",
-        "EISENHAUER_MATRIX": "Eisenhauer Matrix",
+        "EISENHAUER_MATRIX": "Eisenhower Matrix",
         "IMPORTANT": "Important",
         "IN_PROGRESS": "In Progress",
         "KANBAN": "Kanban",
@@ -88,11 +88,13 @@
       "V": {
         "ADD_NEW_BOARD": "Add new board",
         "CONFIRM_DELETE": "Do you really want to delete this board?",
+        "CREATE_NEW_TAG_BTN": "Create Tag",
+        "CREATE_NEW_TAG_MSG": "1 new tag needs to be created for this board to work",
+        "CREATE_NEW_TAGS_BTN": "Create Tags",
+        "CREATE_NEW_TAGS_MSG": "{{nr}} new tags needs to be created for this board to work",
         "EDIT_BOARD": "Edit board",
-        "MISSING_TAGS_MSG": "There are {{nr}} missing tags required for this board to work",
-        "MISSING_TAGS_BTN": "Create missing tags",
-        "NO_PANELS_MSG": "This board has no panels configured. Add some panels to it.",
-        "NO_PANELS_BTN": "Configure Board"
+        "NO_PANELS_BTN": "Configure Board",
+        "NO_PANELS_MSG": "This board has no panels configured. Add some panels to it."
       }
     },
     "BOOKMARK": {
@@ -194,11 +196,18 @@
       }
     },
     "FOCUS_MODE": {
+      "B": {
+        "SESSION_RUNNING": "Focus Session is running",
+        "TO_FOCUS_OVERLAY": "To Focus Overlay"
+      },
       "BACK_TO_PLANNING": "Back to Planning",
       "CANCEL_FOCUS_SESSION": "",
       "CONGRATS": "Congrats for completing this session!",
       "CONTINUE_FOCUS_SESSION": "Continue Focus Session",
+      "COUNTDOWN": "Countdown",
       "FINISH_TASK_AND_SELECT_NEXT": "Finish task and select next",
+      "FLOWTIME": "Flowtime",
+      "FOR_TASK": "for task",
       "GET_READY": "Get ready for your focus session!",
       "GO_TO_PROCRASTINATION": "Get help, when procrastinating",
       "GOGOGO": "Go, go, go!!!",
@@ -213,6 +222,7 @@
       "PREP_STRETCH": "Do some mild stretching",
       "SELECT_ANOTHER_TASK": "Select another Task",
       "SELECT_TASK": "Select Task to focus on",
+      "SESSION_COMPLETED": "Focus Session Completed!",
       "SET_FOCUS_SESSION_DURATION": "Set Focus Session Duration",
       "SHOW_HIDE_NOTES_AND_ATTACHMENTS": "Show/hide task notes and attachments",
       "START_FOCUS_SESSION": "Start Focus Session",
@@ -636,6 +646,7 @@
       "D": {
         "ADD_PLANNED": {
           "ADD_TO_TODAY": "Add to Today",
+          "RE_PLAN_ALL": "Reschedule all",
           "TITLE": "Add planned tasks to Today"
         },
         "PLAN_FOR_DAY": {
@@ -983,6 +994,9 @@
         "L_TITLE": "Tag Name",
         "TITLE": "Basic Settings"
       },
+      "TTL": {
+        "ADD_NEW_TAG": "Add new Tag"
+      },
       "S": {
         "UPDATED": "Tag Settings were updated"
       }
@@ -1048,6 +1062,7 @@
         "TOGGLE_ATTACHMENTS": "Show/Hide attachments",
         "TOGGLE_DETAIL_PANEL": "Show/Hide additional info",
         "TOGGLE_DONE": "Mark as done/undone",
+        "TOGGLE_TAGS": "Toggle Tags",
         "TOGGLE_SUB_TASK_VISIBILITY": "Toggle sub task visibility",
         "TRACK_TIME": "Start tracking time",
         "TRACK_TIME_STOP": "Pause tracking time",
@@ -1336,6 +1351,8 @@
     "LOGIN": "Login",
     "LOGOUT": "Logout",
     "MINUTES": "{{m}} minutes",
+    "MOVE_BACKWARD": "Move Backward",
+    "MOVE_FORWARD": "Move Forward",
     "NEXT": "Next",
     "NO_CON": "You are currently offline. Please reconnect to the internet.",
     "NONE": "None",

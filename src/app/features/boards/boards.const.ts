@@ -1,8 +1,11 @@
-import { BoardCfg, BoardPanelCfgTaskDoneState } from './boards.model';
+import {
+  BoardCfg,
+  BoardPanelCfgScheduledState,
+  BoardPanelCfgTaskDoneState,
+} from './boards.model';
 import { IMPORTANT_TAG, IN_PROGRESS_TAG, URGENT_TAG } from '../tag/tag.const';
 import { T } from '../../t.const';
 
-// TODO translate strings
 export const DEFAULT_BOARDS: BoardCfg[] = [
   {
     id: 'EISENHOWER_MATRIX',
@@ -15,7 +18,9 @@ export const DEFAULT_BOARDS: BoardCfg[] = [
         includedTagIds: [IMPORTANT_TAG.id, URGENT_TAG.id],
         excludedTagIds: [],
         taskIds: [],
-        taskDoneState: BoardPanelCfgTaskDoneState.All,
+        taskDoneState: BoardPanelCfgTaskDoneState.UnDone,
+        scheduledState: BoardPanelCfgScheduledState.All,
+        isParentTasksOnly: true,
       },
       {
         id: 'NOT_URGENT_AND_IMPORTANT',
@@ -23,7 +28,9 @@ export const DEFAULT_BOARDS: BoardCfg[] = [
         includedTagIds: [IMPORTANT_TAG.id],
         excludedTagIds: [URGENT_TAG.id],
         taskIds: [],
-        taskDoneState: BoardPanelCfgTaskDoneState.All,
+        taskDoneState: BoardPanelCfgTaskDoneState.UnDone,
+        scheduledState: BoardPanelCfgScheduledState.All,
+        isParentTasksOnly: true,
       },
       {
         id: 'URGENT_AND_NOT_IMPORTANT',
@@ -31,7 +38,9 @@ export const DEFAULT_BOARDS: BoardCfg[] = [
         includedTagIds: [URGENT_TAG.id],
         excludedTagIds: [IMPORTANT_TAG.id],
         taskIds: [],
-        taskDoneState: BoardPanelCfgTaskDoneState.All,
+        taskDoneState: BoardPanelCfgTaskDoneState.UnDone,
+        scheduledState: BoardPanelCfgScheduledState.All,
+        isParentTasksOnly: true,
       },
       {
         id: 'NOT_URGENT_AND_NOT_IMPORTANT',
@@ -39,7 +48,9 @@ export const DEFAULT_BOARDS: BoardCfg[] = [
         includedTagIds: [],
         excludedTagIds: [IMPORTANT_TAG.id, URGENT_TAG.id],
         taskIds: [],
-        taskDoneState: BoardPanelCfgTaskDoneState.All,
+        taskDoneState: BoardPanelCfgTaskDoneState.UnDone,
+        scheduledState: BoardPanelCfgScheduledState.All,
+        isParentTasksOnly: true,
       },
     ],
   },
@@ -55,6 +66,8 @@ export const DEFAULT_BOARDS: BoardCfg[] = [
         includedTagIds: [],
         excludedTagIds: [IN_PROGRESS_TAG.id],
         taskIds: [],
+        scheduledState: BoardPanelCfgScheduledState.All,
+        isParentTasksOnly: false,
       },
       {
         id: 'IN_PROGRESS',
@@ -63,6 +76,8 @@ export const DEFAULT_BOARDS: BoardCfg[] = [
         includedTagIds: [IN_PROGRESS_TAG.id],
         excludedTagIds: [],
         taskIds: [],
+        scheduledState: BoardPanelCfgScheduledState.All,
+        isParentTasksOnly: false,
       },
       {
         id: 'DONE',
@@ -71,6 +86,8 @@ export const DEFAULT_BOARDS: BoardCfg[] = [
         includedTagIds: [],
         excludedTagIds: [IN_PROGRESS_TAG.id],
         taskIds: [],
+        scheduledState: BoardPanelCfgScheduledState.All,
+        isParentTasksOnly: false,
       },
     ],
   },

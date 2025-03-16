@@ -7,8 +7,8 @@ import {
   input,
 } from '@angular/core';
 import { BoardCfg } from '../boards.model';
-import { BoardTaskListComponent } from '../board-task-list/board-task-list.component';
-import { MatButton, MatIconButton } from '@angular/material/button';
+import { BoardPanelComponent } from '../board-panel/board-panel.component';
+import { MatButton } from '@angular/material/button';
 import { MatIcon } from '@angular/material/icon';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { Store } from '@ngrx/store';
@@ -29,7 +29,7 @@ import { T } from '../../../t.const';
 @Component({
   selector: 'board',
   standalone: true,
-  imports: [BoardTaskListComponent, MatIconButton, MatIcon, MatButton, TranslatePipe],
+  imports: [BoardPanelComponent, MatIcon, MatButton, TranslatePipe],
   templateUrl: './board.component.html',
   styleUrl: './board.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

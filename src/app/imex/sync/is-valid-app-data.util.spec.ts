@@ -41,7 +41,6 @@ describe('isValidAppData()', () => {
   describe('should return false for', () => {
     [
       'note',
-      'bookmark',
       'improvement',
       'obstruction',
       'metric',
@@ -192,7 +191,7 @@ describe('isValidAppData()', () => {
             ...DEFAULT_TASK,
             id: 'parent',
             title: 'parent',
-            parentId: null,
+            parentId: undefined,
             subTaskIds: ['subTaskUnarchived'],
           },
         ]),
@@ -248,7 +247,7 @@ describe('isValidAppData()', () => {
             ...DEFAULT_TASK,
             id: 'parent',
             title: 'parent',
-            parentId: null,
+            parentId: undefined,
             subTaskIds: ['subTaskArchived'],
           },
         ]),
@@ -481,7 +480,7 @@ describe('isValidAppData()', () => {
           ...DEFAULT_TASK,
           id: 'parent',
           title: 'parent',
-          parentId: null,
+          parentId: undefined,
         },
       ]),
     } as any;

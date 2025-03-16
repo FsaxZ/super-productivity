@@ -1,14 +1,14 @@
 name: Create android Play Store APK
 on:
   push:
-    branches: [test/git-actions]
+    branches: [master, release/*, test/git-actions]
     tags:
       - v*
   workflow_dispatch:
     inputs: {}
 
 jobs:
-  build:
+  build-android:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
@@ -25,6 +25,11 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
       #      - name: Build with Gradle
       #        run: ./gradlew build
+      - name: Setup android-sdk
+        uses: android-actions/setup-android@v3
+        with:
+          accept-android-sdk-licenses: true
+          log-accepted-android-sdk-licenses: true #make accepting the android sdk license verbose
 
       - name: Get npm cache directory
         id: npm-cache-dir
@@ -43,13 +48,11 @@ jobs:
 
       - name: Decode Keystore
         env:
-          ENCODED_STRING: ${{ secrets.DROID_KEYSTORE_BASE_64 }}
           RELEASE_KEYSTORE_PASSWORD: ${{ secrets.DROID_KEYSTORE_PASSWORD }}
           RELEASE_KEYSTORE_ALIAS: ${{ secrets.DROID_KEYSTORE_ALIAS }}
           RELEASE_KEY_PASSWORD: ${{ secrets.DROID_KEY_PASSWORD }}
         run: |
-          echo $ENCODED_STRING > keystore-b64.txt
-          base64 -d keystore-b64.txt > keystore.jks
+          echo "${{ secrets.DROID_KEYSTORE_BASE_64 }}" | base64 --decode > keystore.jks
 
       - name: Build
         run: npm run dist:android:prod
@@ -57,6 +60,22 @@ jobs:
           RELEASE_KEYSTORE_PASSWORD: ${{ secrets.DROID_KEYSTORE_PASSWORD }}
           RELEASE_KEYSTORE_ALIAS: ${{ secrets.DROID_KEYSTORE_ALIAS }}
           RELEASE_KEY_PASSWORD: ${{ secrets.DROID_KEY_PASSWORD }}
+
+      - name: DEBUG
+        run: |
+          ls -la android/app/build/outputs
+          ls -la android/app/build/outputs/apk
+          ls -la android/app/build/outputs/apk/play
+          ls -la android/app/build/outputs/apk/play/release
+
+      - name: Sign APK
+        run: |
+          jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA-256 \
+            -keystore keystore.jks \
+            -storepass ${{ secrets.DROID_KEYSTORE_PASSWORD }} \
+            -keypass ${{ secrets.DROID_KEY_PASSWORD }} \
+            android/app/build/outputs/apk/play/release/app-play-release-unsigned.apk \
+            ${{ secrets.DROID_KEYSTORE_ALIAS }}
 
       - name: 'Upload Artifact'
         uses: actions/upload-artifact@v4
